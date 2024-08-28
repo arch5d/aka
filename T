@@ -1,0 +1,99 @@
+import cv2
+import numpy as np
+
+def hello(x):
+    pass
+
+# Initialize camera capture
+cap = cv2.VideoCapture(0)
+cv2.namedWindow("bars")
+
+# Initialize trackbars
+cv2.createTrackbar("upper_hue1", "bars", 10, 180, hello)
+cv2.createTrackbar("upper_saturation1", "bars", 255, 255, hello)
+cv2.createTrackbar("upper_value1", "bars", 255, 255, hello)
+cv2.createTrackbar("lower_hue1", "bars", 0, 180, hello)
+cv2.createTrackbar("lower_saturation1", "bars", 100, 255, hello)
+cv2.createTrackbar("lower_value1", "bars", 100, 255, hello)
+
+cv2.createTrackbar("upper_hue2", "bars", 180, 180, hello)
+cv2.createTrackbar("upper_saturation2", "bars", 255, 255, hello)
+cv2.createTrackbar("upper_value2", "bars", 255, 255, hello)
+cv2.createTrackbar("lower_hue2", "bars", 170, 180, hello)
+cv2.createTrackbar("lower_saturation2", "bars", 100, 255, hello)
+cv2.createTrackbar("lower_value2", "bars", 100, 255, hello)
+
+# Capture initial frame for background
+while True:
+    ret, init_frame = cap.read()
+    if ret:
+        break
+    cv2.waitKey(1000)
+
+# Main loop
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    inspect = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Get HSV values for masking the cloak
+    upper_hue1 = cv2.getTrackbarPos("upper_hue1", "bars")
+    upper_saturation1 = cv2.getTrackbarPos("upper_saturation1", "bars")
+    upper_value1 = cv2.getTrackbarPos("upper_value1", "bars")
+    lower_hue1 = cv2.getTrackbarPos("lower_hue1", "bars")
+    lower_saturation1 = cv2.getTrackbarPos("lower_saturation1", "bars")
+    lower_value1 = cv2.getTrackbarPos("lower_value1", "bars")
+
+    upper_hue2 = cv2.getTrackbarPos("upper_hue2", "bars")
+    upper_saturation2 = cv2.getTrackbarPos("upper_saturation2", "bars")
+    upper_value2 = cv2.getTrackbarPos("upper_value2", "bars")
+    lower_hue2 = cv2.getTrackbarPos("lower_hue2", "bars")
+    lower_saturation2 = cv2.getTrackbarPos("lower_saturation2", "bars")
+    lower_value2 = cv2.getTrackbarPos("lower_value2", "bars")
+
+    # Kernel for dilation
+    kernel = np.ones((3, 3), np.uint8)
+
+    upper_hsv1 = np.array([upper_hue1, upper_saturation1, upper_value1])
+    lower_hsv1 = np.array([lower_hue1, lower_saturation1, lower_value1])
+
+    upper_hsv2 = np.array([upper_hue2, upper_saturation2, upper_value2])
+    lower_hsv2 = np.array([lower_hue2, lower_saturation2, lower_value2])
+
+    mask1 = cv2.inRange(inspect, lower_hsv1, upper_hsv1)
+    mask2 = cv2.inRange(inspect, lower_hsv2, upper_hsv2)
+
+    mask = mask1 + mask2
+    mask = cv2.medianBlur(mask, 3)
+    mask_inv = 255 - mask
+    mask = cv2.dilate(mask, kernel, iterations=5)
+
+    # The mixing of frames in a combination to achieve the required frame
+    b = frame[:, :, 0]
+    g = frame[:, :, 1]
+    r = frame[:, :, 2]
+    b = cv2.bitwise_and(mask_inv, b)
+    g = cv2.bitwise_and(mask_inv, g)
+    r = cv2.bitwise_and(mask_inv, r)
+    frame_inv = cv2.merge((b, g, r))
+
+    b = init_frame[:, :, 0]
+    g = init_frame[:, :, 1]
+    r = init_frame[:, :, 2]
+    b = cv2.bitwise_and(b, mask)
+    g = cv2.bitwise_and(g, mask)
+    r = cv2.bitwise_and(r, mask)
+    blanket_area = cv2.merge((b, g, r))
+
+    final = cv2.bitwise_or(frame_inv, blanket_area)
+
+    cv2.imshow("Harry's Cloak", final)
+    cv2.imshow("original", frame)
+
+    if cv2.waitKey(3) == ord('q'):
+        break
+
+cv2.destroyAllWindows()
+cap.release()
